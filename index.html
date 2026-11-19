@@ -171,6 +171,29 @@ footer { max-width: 880px; margin: 0 auto; padding: 48px 24px 56px; color: var(-
       <div class="fact"><h3>Not a diagnosis</h3><p>You can't tell if someone has a condition by looking at their brain this way. The differences only show up across large groups.</p></div>
     </div>
     <details>
+      <summary>Prototype Writeup</summary>
+      <p class="small">
+        Our process began with selecting a topic, which we actually came to first by imagining
+        what sort of visualization we would like. We then settled on modelling brain diseases,
+        and found an appropriate dataset. From there, we created our initial exploratory
+        visualizations, then with the help of Claude created a rough prototype of the sort of 3D 
+        visualization we wanted for the final submission, as a proof of concept. We made some 
+        minor changes to this baseline 3D visualization template, then added the data for the 
+        brain measurements for various conditions and created a scale. We then added that 
+        visualization to this webpage with a brief descriptive writeup.
+      </p>
+      <p class="small">
+        We have already succeeded in what we expect to be the most challenging part of 
+        the project, namely processing the data and creating the "template" brain visualization
+        which will be modified for all of the conditions. From here, we will mostly be making
+        smaller changes with how the data are displayed, the text descriptions included in the 
+        viz, likely the way the brain model is displayed, and more. These tweaks will be
+        shorter and simpler than the main build, but mostly done manually. The main focus of
+        the remainder of our process will be the writeup, which we see as needing the most work,
+        and which we intend to do fully by hand, unlike much of the viz code.
+      </p>
+    </details>
+    <details>
       <summary>For scientists: methods and sources</summary>
       <p class="small">Values are Cohen's d (case vs control, the toolbox's d_icv column) for cortical thickness in 68 Desikan–Killiany areas and volume in 16 subcortical structures. An area is shown as different when the difference passes FDR correction (q &lt; .05; uncorrected p &lt; .05 where only that was released: Parkinson's, and subcortical results for ADHD and depression) and |d| ≥ 0.2. "A little", "noticeably" and "much" mean |d| of 0.2–0.5, 0.5–0.8 and ≥ 0.8. Some older subcortical results average left and right. Epilepsy is all types combined. Data from the <a href="https://github.com/MICA-MNI/ENIGMA" target="_blank" rel="noopener">ENIGMA Toolbox</a> (Larivière et al., 2021, Nature Methods).</p>
       <div class="refs" id="refs"></div>
