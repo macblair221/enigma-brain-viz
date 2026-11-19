@@ -4,6 +4,12 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>ENIGMA Brain Explorer</title>
+<meta name="description" content="An interactive 3D brain showing how 11 conditions, from schizophrenia to ADHD, change brain structure. Built from ENIGMA consortium MRI data.">
+<meta property="og:title" content="How brain conditions change the brain">
+<meta property="og:description" content="Pick a condition and watch the brain light up. Built from tens of thousands of MRI scans.">
+<meta property="og:type" content="website">
+<meta name="theme-color" content="#050506">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='15' fill='%23050506'/%3E%3Ccircle cx='16' cy='16' r='7' fill='%235b9bf5'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600&family=Geist+Mono:wght@400&display=swap" rel="stylesheet">
@@ -13,7 +19,7 @@
   --bg: #050506;
   --ink: #f4f4f5;
   --ink-2: #a1a1aa;
-  --ink-3: #63636b;
+  --ink-3: #8a8a93;   /* 5.6:1 on the background, passes WCAG AA for small text */
   --line: rgba(255,255,255,.12);
   --smaller: #60a5fa;
   --bigger: #fb923c;
@@ -39,12 +45,17 @@ a { color: var(--ink); text-underline-offset: 3px; }
 .intro { text-align: center; max-width: 720px; }
 .intro h1 { font-weight: 300; font-size: clamp(34px, 5.2vw, 60px); line-height: 1.04; letter-spacing: -.035em; margin: 6px 0 14px; text-wrap: balance; }
 .intro .about { color: var(--ink-2); font-size: 17px; margin: 0 auto; max-width: 52ch; min-height: 2.9em; }
-.stagewrap { position: relative; width: 100%; max-width: 1100px; flex: 1; min-height: 380px; margin: 4px 0 6px; }
-#gl { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: pan-y; cursor: grab; }
+.stagewrap { position: relative; width: 100%; max-width: 1100px; flex: 1; min-height: 380px; margin: 4px 0 6px; background: radial-gradient(38% 46% at 50% 54%, rgba(120,140,190,.10), transparent 70%); }
+#gl { position: absolute; inset: 0; width: 100%; height: 100%; display: block; cursor: grab; opacity: 0; transition: opacity .9s ease; }
+#gl.ready { opacity: 1; }
+#gl:focus-visible { outline: 1px solid rgba(255,255,255,.28); outline-offset: -1px; border-radius: 16px; }
+.hint { font-size: 12.5px; color: var(--ink-3); margin: 0 0 14px; min-height: 1.2em; transition: opacity .6s; }
+.hint.gone { opacity: 0; }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 #gl.drag { cursor: grabbing; }
 #gl.hit { cursor: pointer; }
 .loading { position: absolute; inset: 0; display: grid; place-items: center; color: var(--ink-3); font-size: 14px; }
-.label { position: absolute; pointer-events: none; z-index: 5; min-width: 190px; max-width: 260px; padding: 12px 14px; border-radius: 12px; background: rgba(12,12,14,.9); border: 1px solid var(--line); backdrop-filter: blur(10px); transform: translate(16px, -50%); opacity: 0; transition: opacity .12s; }
+.label { position: absolute; pointer-events: none; z-index: 5; min-width: 220px; max-width: 290px; padding: 12px 14px; border-radius: 12px; background: rgba(12,12,14,.9); border: 1px solid var(--line); backdrop-filter: blur(10px); transform: translate(16px, -50%); opacity: 0; transition: opacity .12s; }
 .label.on { opacity: 1; }
 .label .nm { font-size: 15px; font-weight: 500; }
 .label .fn { color: var(--ink-2); font-size: 13px; margin-top: 1px; }
@@ -53,7 +64,7 @@ a { color: var(--ink); text-underline-offset: 3px; }
 .label .dots i { width: 7px; height: 7px; border-radius: 50%; background: #2a2a2f; }
 .label .sci { font: 11px var(--f-mono); color: var(--ink-3); margin-top: 8px; }
 
-.insight { text-align: center; max-width: 640px; font-size: 17px; margin: 0 0 18px; min-height: 2.9em; text-wrap: balance; }
+.insight { text-align: center; max-width: 640px; font-size: 17px; margin: 0 0 18px; min-height: 4.65em; text-wrap: balance; }   /* reserve 3 lines: no jump when switching */
 .insight b { font-weight: 600; }
 .pills { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; max-width: 900px; }
 .pill { padding: 8px 16px; border-radius: 999px; border: 1px solid var(--line); color: var(--ink-2); font-size: 14px; transition: background .15s, color .15s, border-color .15s; }
@@ -100,13 +111,14 @@ summary:hover { color: var(--ink); }
 footer { max-width: 880px; margin: 0 auto; padding: 48px 24px 56px; color: var(--ink-3); font-size: 12.5px; }
 
 @media (max-width: 720px) {
+  .hint { display: none; }
   .top { padding: 18px 20px; }
   .intro .about, .insight { font-size: 15.5px; }
   .stagewrap { min-height: 340px; }
   .pill { padding: 7px 13px; font-size: 13.5px; }
   .bar, .axis { grid-template-columns: 112px 1fr 40px; gap: 10px; }
   .facts { grid-template-columns: 1fr; }
-  .label { left: 12px !important; right: 12px; top: auto !important; bottom: 12px; transform: none; max-width: none; }
+  .label { position: fixed; left: 12px !important; right: 12px; top: auto !important; bottom: calc(12px + env(safe-area-inset-bottom)); transform: none; max-width: none; z-index: 20; box-shadow: 0 -8px 30px rgba(0,0,0,.6); }
 }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
 </style>
@@ -124,10 +136,12 @@ footer { max-width: 880px; margin: 0 auto; padding: 48px 24px 56px; color: var(-
       <p class="about" id="about"></p>
     </div>
     <div class="stagewrap" id="wrap">
-      <canvas id="gl" aria-label="3D brain. Drag to spin it. Point at a glowing area to learn about it."></canvas>
+      <canvas id="gl" tabindex="0" aria-label="3D brain. Drag to turn it, point at an area to learn about it, or use the arrow keys to step through the changed areas. Home resets the view."></canvas>
       <div class="loading" id="loading">Loading brain…</div>
-      <div class="label" id="label" role="status"></div>
+      <div class="label" id="label" aria-hidden="true"></div>
+      <div class="sr" id="live" aria-live="polite"></div>
     </div>
+    <p class="hint" id="hint">Drag to turn · Point at an area · Double-click to reset</p>
     <p class="insight" id="insight" aria-live="polite"></p>
     <div class="pills" id="pills" role="group" aria-label="Choose a condition"></div>
     <div class="key">
@@ -249,22 +263,28 @@ function colorFor(id, r, out) {
 const S = { view: 'scz', hover: -1, inside: false, idle: true };
 { const h = location.hash.slice(1); if (C[h]) S.view = h; }
 const wrap = $('wrap'), canvas = $('gl');
-const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
-renderer.setPixelRatio(Math.min(devicePixelRatio, 2)); renderer.setClearColor(0, 0);
+const REDUCED = matchMedia('(prefers-reduced-motion: reduce)').matches;
+let renderer = null;
+try { renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true }); renderer.setPixelRatio(Math.min(devicePixelRatio, 2)); renderer.setClearColor(0, 0); }
+catch (e) { renderer = null; }   // no WebGL: the rest of the page still works
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(28, 1, 1, 3000); scene.add(camera);
 scene.add(new THREE.HemisphereLight(0xffffff, 0x30303a, 0.6));
 const key = new THREE.DirectionalLight(0xffffff, 1.0); key.position.set(-0.3, 0.7, 1); camera.add(key);
 const rim = new THREE.DirectionalLight(0xffffff, 0.5); rim.position.set(0.6, 0.2, -1); camera.add(rim);
 const controls = new OrbitControls(camera, canvas);
-Object.assign(controls, { enableDamping: true, dampingFactor: 0.07, enableZoom: false, enablePan: false, autoRotate: true, autoRotateSpeed: 0.6, rotateSpeed: 0.7 });
+Object.assign(controls, { enableDamping: true, dampingFactor: 0.07, enableZoom: false, enablePan: false, autoRotate: !REDUCED, autoRotateSpeed: 0.6, rotateSpeed: 0.7 });
+canvas.style.touchAction = 'pan-y';   // phones: vertical swipes scroll the page, horizontal swipes turn the brain
+let dirty = true, onScreen = true;     // draw only when something changed, and only while visible
+controls.addEventListener('change', () => { dirty = true; });
+new IntersectionObserver(es => { onScreen = es[0].isIntersecting; if (onScreen) dirty = true; }).observe(wrap);
 const brain = new THREE.Group(); scene.add(brain);
-const trueColor = m => { m.onBeforeCompile = sh => { sh.fragmentShader = sh.fragmentShader.replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\n totalEmissiveRadiance += diffuseColor.rgb * 0.55;'); }; return m; };
+const trueColor = m => { m.onBeforeCompile = sh => { sh.fragmentShader = sh.fragmentShader.replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\n totalEmissiveRadiance += diffuseColor.rgb * 0.5;\n float rimF = pow(1.0 - clamp(dot(normal, normalize(vViewPosition)), 0.0, 1.0), 2.5);\n totalEmissiveRadiance += vec3(0.55, 0.62, 0.78) * rimF * 0.24;'); }; return m; };
 const cortexMat = trueColor(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.75, metalness: 0 }));
-const borderMat = new THREE.LineBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.4 });
+const borderMat = new THREE.LineBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.26 });
 const outlineMat = new THREE.LineBasicMaterial({ color: 0xffffff });
 const cortex = {}, subc = [];
-const RG = Array.from({ length: NREG }, () => ({ edges: [] }));
+const RG = Array.from({ length: NREG }, () => ({ edges: [], c: new THREE.Vector3(), n: new THREE.Vector3(), k: 0 }));
 
 function bytes(s) { const b = atob(s.trim()), o = new Uint8Array(b.length); for (let i = 0; i < b.length; i++) o[i] = b.charCodeAt(i); return o; }
 async function loadMesh() {
@@ -287,6 +307,7 @@ async function loadMesh() {
 }
 function buildCortex(p, g, tri, sh) {
   const P = g.attributes.position.array, N = g.attributes.normal.array, I = g.index.array, nv = p.nv, seen = new Map(), border = [];
+  for (let f = 0; f < p.nf; f++) if (tri[f] < NREG) for (let e = 0; e < 3; e++) { const v = I[3 * f + e], G = RG[tri[f]]; G.c.x += P[3 * v]; G.c.y += P[3 * v + 1]; G.c.z += P[3 * v + 2]; G.n.x += N[3 * v]; G.n.y += N[3 * v + 1]; G.n.z += N[3 * v + 2]; G.k++; }
   for (let f = 0; f < p.nf; f++) for (let e = 0; e < 3; e++) {
     const a = I[3 * f + e], b = I[3 * f + (e + 1) % 3], k = a < b ? a * nv + b : b * nv + a, o = seen.get(k);
     if (o === undefined) seen.set(k, f);
@@ -307,6 +328,9 @@ function buildSub(p, g) {
   g.computeBoundsTree();
   const mesh = new THREE.Mesh(g, trueColor(new THREE.MeshStandardMaterial({ color: 0x3a3a40, roughness: 0.6, metalness: 0 })));
   mesh.userData.region = NCT + p.sv; mesh.visible = false; brain.add(mesh); subc[p.sv] = mesh;
+  const P = g.attributes.position.array, G = RG[NCT + p.sv];
+  for (let v = 0; v < p.nv; v++) { G.c.x += P[3 * v]; G.c.y += P[3 * v + 1]; G.c.z += P[3 * v + 2]; G.k++; }
+  G.n.set(p.sv < 8 ? -1 : 1, 0.4, -0.25);
 }
 
 /* ---------- paint with a soft cross-fade ---------- */
@@ -322,6 +346,7 @@ function paint() {
     mesh.geometry.attributes.color.needsUpdate = true;
   }
   subc.forEach((m, k) => m && m.material.color.copy(lin[NCT + k]));
+  dirty = true;
 }
 function stepFade(dt) { if (fade >= 1) return false; fade = Math.min(1, fade + dt / 0.5); const t = 1 - Math.pow(1 - fade, 3); for (let r = 0; r < NREG; r++) cur[r].copy(from[r]).lerp(to[r], t); return true; }
 
@@ -338,7 +363,28 @@ function setInside(v) {
   S.inside = v; $('inside').setAttribute('aria-pressed', String(v));
   for (const h in cortex) { cortex[h].lines.visible = !v; cortex[h].mesh.renderOrder = v ? 2 : 0; }
   Object.assign(cortexMat, { transparent: v, opacity: v ? 0.07 : 1, depthWrite: !v }); cortexMat.needsUpdate = true;
-  subc.forEach(m => m && (m.visible = v)); updateOutline();
+  subc.forEach(m => m && (m.visible = v)); updateOutline(); dirty = true;
+}
+
+/* ---------- camera moves ---------- */
+const HOME = new THREE.Vector3(-340, 90, -150);
+let fly = null;
+function flyTo(dir, dist) {
+  const p0 = camera.position.clone(), d1 = dir.clone().normalize();
+  fly = { p0, r0: p0.length(), r1: dist || p0.length(), q: new THREE.Quaternion().setFromUnitVectors(p0.clone().normalize(), d1), t: REDUCED ? 0.999 : 0 };
+}
+function stepFly(dt) {
+  if (!fly) return; fly.t = Math.min(1, fly.t + dt / 0.85);
+  const e = fly.t < .5 ? 4 * fly.t ** 3 : 1 - Math.pow(-2 * fly.t + 2, 3) / 2;
+  camera.position.copy(fly.p0).normalize().applyQuaternion(new THREE.Quaternion().slerp(fly.q, e)).multiplyScalar(fly.r0 + (fly.r1 - fly.r0) * e);
+  dirty = true; if (fly.t >= 1) fly = null;
+}
+function flyToRegion(r) {
+  const G = RG[r]; if (!G.k) return;
+  if (r >= NCT) { if (!S.inside) setInside(true); flyTo(new THREE.Vector3(G.n.x, G.n.y, G.n.z), HOME.length()); return; }
+  if (S.inside) setInside(false);
+  const n = G.n.clone().normalize(), c = G.c.clone().divideScalar(G.k).normalize().multiplyScalar(0.4);
+  flyTo(n.add(c), HOME.length());
 }
 
 /* ---------- hover label ---------- */
@@ -360,7 +406,8 @@ function showLabel(r, x, y) {
   label.innerHTML = `<div class="nm">${esc(R.name)}</div><div class="fn">${esc(helps(r))}</div>
     <div class="chg" style="color:${on ? col : 'var(--ink-2)'}">${on ? `<span class="dots">${dots}</span>${words(e[0])}` : e ? 'About the same as usual' : 'Not measured'}</div>
     <div class="sci">${R.side} side${e ? ` · d ${e[0] < 0 ? '−' : '+'}${Math.abs(e[0]).toFixed(2)}` : ''}</div>`;
-  const wr = wrap.getBoundingClientRect(); let lx = x - wr.left, ly = y - wr.top;
+  const wr = wrap.getBoundingClientRect(); if (x == null) { x = wr.left + wr.width * 0.68; y = wr.top + wr.height * 0.3; }
+  let lx = x - wr.left, ly = y - wr.top;
   if (lx + 290 > wr.width) lx -= 300;
   label.style.left = lx + 'px'; label.style.top = ly + 'px'; label.classList.add('on');
 }
@@ -368,10 +415,31 @@ let down = null, pending = null;
 canvas.addEventListener('pointerdown', ev => { down = { x: ev.clientX, y: ev.clientY }; canvas.classList.add('drag'); stop(); });
 addEventListener('pointerup', ev => { canvas.classList.remove('drag'); if (down && ev.target === canvas && Math.hypot(ev.clientX - down.x, ev.clientY - down.y) < 6) { const r = pick(ev.clientX, ev.clientY); setHover(r); showLabel(r, ev.clientX, ev.clientY); } down = null; });
 canvas.addEventListener('pointermove', ev => { if (ev.pointerType === 'mouse') pending = ev; });
-canvas.addEventListener('pointerleave', () => { pending = null; setHover(-1); showLabel(-1); });
+// touch: tapping anywhere off the brain closes the label sheet
+document.addEventListener('pointerdown', ev => { if (ev.pointerType !== 'mouse' && ev.target !== canvas && S.hover >= 0) { setHover(-1); showLabel(-1); } });
+canvas.addEventListener('pointerleave', ev => { if (ev.pointerType !== 'mouse') return; pending = null; setHover(-1); showLabel(-1); });   // touch fires pointerleave after every tap; only a mouse really 'leaves'
+function spoken(r) {
+  const e = entry(S.view, r), R0 = REG[r];
+  return `${R0.name}, ${R0.side} side. ${helps(r)}. ${shows(e) ? words(e[0]) : e ? 'About the same as usual' : 'Not measured'}.`;
+}
+let kbList = [], kbIdx = -1;
+function kbOrder() {   // changed areas first, biggest change first, then the rest
+  return [...Array(NREG).keys()].sort((a, b) => { const ea = entry(S.view, a), eb = entry(S.view, b); return (shows(eb) - shows(ea)) || (Math.abs(eb ? eb[0] : 0) - Math.abs(ea ? ea[0] : 0)); });
+}
+canvas.addEventListener('keydown', ev => {
+  if (!['ArrowRight', 'ArrowDown', 'ArrowLeft', 'ArrowUp', 'Escape', 'Home'].includes(ev.key)) return;
+  ev.preventDefault(); stop();
+  if (ev.key === 'Home') { flyTo(HOME, HOME.length()); return; }
+  if (ev.key === 'Escape') { kbIdx = -1; setHover(-1); showLabel(-1); return; }
+  if (!kbList.length) kbList = kbOrder();
+  kbIdx = (kbIdx + (ev.key === 'ArrowRight' || ev.key === 'ArrowDown' ? 1 : -1) + kbList.length) % kbList.length;
+  const r = kbList[kbIdx]; flyToRegion(r); setHover(r); showLabel(r); $('live').textContent = spoken(r);
+});
+canvas.addEventListener('blur', () => { if (kbIdx >= 0) { kbIdx = -1; setHover(-1); showLabel(-1); } });
+canvas.addEventListener('dblclick', () => { stop(); flyTo(HOME, HOME.length()); });
 function setHover(r) { if (r === S.hover) return; S.hover = r; canvas.classList.toggle('hit', r >= 0); paint(); updateOutline(); }
 function handleHover() { if (!pending || down) return; const ev = pending; pending = null; const r = pick(ev.clientX, ev.clientY); if (r >= 0) stop(); setHover(r); showLabel(r, ev.clientX, ev.clientY); }
-function stop() { if (S.idle) { S.idle = false; controls.autoRotate = false; } }
+function stop() { if (S.idle) { S.idle = false; controls.autoRotate = false; setTimeout(() => $('hint').classList.add('gone'), 2500); } }
 
 /* ---------- words on the page ---------- */
 function renderText() {
@@ -391,8 +459,9 @@ function renderText() {
 }
 function setView(id, scroll) {
   S.view = id; try { history.replaceState(null, '', '#' + id); } catch (e) {}
+  kbList = []; kbIdx = -1;
   retarget(); renderText(); if (S.hover >= 0) showLabel(-1);
-  if (scroll) document.querySelector('.hero').scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+  if (scroll) document.querySelector('.hero').scrollIntoView({ behavior: REDUCED ? 'auto' : 'smooth' });
 }
 $('pills').innerHTML = COND.map(c => `<button class="pill" data-id="${c.id}" aria-pressed="false">${esc(c.name)}</button>`).join('');
 $('pills').addEventListener('click', ev => { const b = ev.target.closest('.pill'); if (b) setView(b.dataset.id); });
@@ -404,18 +473,29 @@ $('inside').addEventListener('click', () => { setInside(!S.inside); renderText()
 $('refs').innerHTML = COND.map(c => { const d = RAW[c.id]; return `<span>${esc(c.name)}</span><div><a href="${d.urlCort}" target="_blank" rel="noopener">${esc(d.refCort)}</a>${d.refSub !== d.refCort ? `; <a href="${d.urlSub}" target="_blank" rel="noopener">${esc(d.refSub)}</a>` : ''}</div>`; }).join('');
 
 /* ---------- loop ---------- */
-function size() { const w = wrap.clientWidth, h = wrap.clientHeight; renderer.setSize(w, h, false); camera.aspect = w / Math.max(1, h); camera.zoom = Math.min(1.15, (w / h) * (w < 720 ? 0.9 : 0.72)); camera.updateProjectionMatrix(); }
+function size() { if (!renderer) return; const w = wrap.clientWidth, h = wrap.clientHeight; renderer.setSize(w, h, false); dirty = true; camera.aspect = w / Math.max(1, h); camera.zoom = Math.min(1.15, (w / h) * (w < 720 ? 0.9 : 0.72)); camera.updateProjectionMatrix(); }
 new ResizeObserver(size).observe(wrap);
 let last = performance.now();
-function loop(now) { const dt = Math.min(0.05, (now - last) / 1000); last = now; if (stepFade(dt)) paint(); controls.update(); handleHover(); renderer.render(scene, camera); requestAnimationFrame(loop); }
+function loop(now) {
+  const dt = Math.min(0.05, (now - last) / 1000); last = now;
+  if (onScreen) {
+    if (stepFade(dt)) paint();
+    stepFly(dt); controls.update(); handleHover();
+    if (dirty) { renderer.render(scene, camera); dirty = false; }
+  }
+  requestAnimationFrame(loop);   // browsers pause this in background tabs
+}
 (async () => {
   renderText();
-  try { await loadMesh(); } catch (err) { $('loading').textContent = 'This browser could not load the 3D brain.'; return; }
+  const noBrain = msg => { $('loading').textContent = msg; $('hint').remove(); canvas.removeAttribute('tabindex'); };
+  if (!renderer) return noBrain('Your browser can\u2019t show the 3D brain, but the chart below works.');
+  try { await loadMesh(); } catch (err) { return noBrain('The 3D brain couldn\u2019t load in this browser, but the chart below works.'); }
   $('loading').remove();
-  camera.position.set(-340, 90, -150);
+  camera.position.copy(HOME);
   for (let r = 0; r < NREG; r++) colorFor(S.view, r, cur[r]);
   paint(); size(); requestAnimationFrame(loop);
-  window.__app = { S, setView, setInside, controls, pick, camera };
+  requestAnimationFrame(() => canvas.classList.add('ready'));
+  window.__app = { S, setView, setInside, controls, pick, camera, renderer, frames: () => renderer.info.render.frame };
 })();
 </script>
 </body>

@@ -9,11 +9,17 @@ Open `index.html` in a browser, or turn on GitHub Pages for this repo (Settings 
 - **The brain:** pick a condition and the brain lights up. Blue areas are smaller than usual in people with that condition, orange areas are bigger, and dark areas show no big difference. Brighter means a bigger difference.
 - **Point at an area** to see its name, what it helps with, and how much it changed ("a little", "noticeably" or "much" smaller or bigger).
 - **See inside** shows the deep structures, like the hippocampus and amygdala.
+- **Keyboard:** click or Tab onto the brain, then use the arrow keys to step through the changed areas (biggest change first). Home resets the view, Escape clears. A screen reader reads each area aloud.
+- **Phones:** swipe sideways to turn the brain, swipe up and down to scroll, tap an area to open its details.
 - **Compare:** a bar chart of how many of the 84 brain areas are different in each condition. Click a bar to see that condition on the brain.
 
 Conditions: 22q11.2 deletion syndrome, ADHD, anorexia, antisocial behavior, autism, bipolar disorder, depression, epilepsy, OCD, Parkinson's disease and schizophrenia.
 
 The page is written so someone with no background (think middle school) can follow it. The raw numbers are still there in small print and in the "For scientists" section at the bottom.
+
+## Built to be light
+
+The brain only re-draws when something changes (dragging, hovering, switching conditions) and pauses when it's scrolled off screen, so it doesn't drain laptop or phone batteries. If a browser can't run WebGL, the 3D view shows a short message and the rest of the page still works. Auto-rotate turns off for anyone who has "reduce motion" set.
 
 ## How the numbers are used
 
