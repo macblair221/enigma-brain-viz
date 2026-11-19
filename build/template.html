@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ENIGMA Brain Explorer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600&family=Geist+Mono:wght@400&display=swap" rel="stylesheet">
+<style>
+:root {
+  /* One visual world: black stage, white type, the brain is the only colored thing. */
+  --bg: #050506;
+  --ink: #f4f4f5;
+  --ink-2: #a1a1aa;
+  --ink-3: #63636b;
+  --line: rgba(255,255,255,.12);
+  --smaller: #60a5fa;
+  --bigger: #fb923c;
+  --f-body: "Geist", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --f-mono: "Geist Mono", ui-monospace, Menlo, monospace;
+  /* layout: a centered column. Hero (words, brain, condition buttons) then one chart, then a short about. */
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body { background: var(--bg); color: var(--ink); font: 400 16px/1.55 var(--f-body); -webkit-font-smoothing: antialiased; }
+button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; }
+:focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; border-radius: 999px; }
+a { color: var(--ink); text-underline-offset: 3px; }
+
+.top { display: flex; justify-content: space-between; align-items: center; padding: 22px 32px; }
+.mark { font-size: 12px; letter-spacing: .28em; text-transform: uppercase; font-weight: 500; }
+.top a { font-size: 13px; color: var(--ink-2); text-decoration: none; }
+.top a:hover { color: var(--ink); }
+
+/* hero */
+.hero { min-height: calc(100svh - 66px); display: flex; flex-direction: column; align-items: center; padding: 8px 20px 28px; }
+.intro { text-align: center; max-width: 720px; }
+.intro h1 { font-weight: 300; font-size: clamp(34px, 5.2vw, 60px); line-height: 1.04; letter-spacing: -.035em; margin: 6px 0 14px; text-wrap: balance; }
+.intro .about { color: var(--ink-2); font-size: 17px; margin: 0 auto; max-width: 52ch; min-height: 2.9em; }
+.stagewrap { position: relative; width: 100%; max-width: 1100px; flex: 1; min-height: 380px; margin: 4px 0 6px; }
+#gl { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: pan-y; cursor: grab; }
+#gl.drag { cursor: grabbing; }
+#gl.hit { cursor: pointer; }
+.loading { position: absolute; inset: 0; display: grid; place-items: center; color: var(--ink-3); font-size: 14px; }
+.label { position: absolute; pointer-events: none; z-index: 5; min-width: 190px; max-width: 260px; padding: 12px 14px; border-radius: 12px; background: rgba(12,12,14,.9); border: 1px solid var(--line); backdrop-filter: blur(10px); transform: translate(16px, -50%); opacity: 0; transition: opacity .12s; }
+.label.on { opacity: 1; }
+.label .nm { font-size: 15px; font-weight: 500; }
+.label .fn { color: var(--ink-2); font-size: 13px; margin-top: 1px; }
+.label .chg { display: flex; align-items: center; gap: 8px; margin-top: 10px; font-size: 14px; font-weight: 500; }
+.label .dots { display: inline-flex; gap: 3px; }
+.label .dots i { width: 7px; height: 7px; border-radius: 50%; background: #2a2a2f; }
+.label .sci { font: 11px var(--f-mono); color: var(--ink-3); margin-top: 8px; }
+
+.insight { text-align: center; max-width: 640px; font-size: 17px; margin: 0 0 18px; min-height: 2.9em; text-wrap: balance; }
+.insight b { font-weight: 600; }
+.pills { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; max-width: 900px; }
+.pill { padding: 8px 16px; border-radius: 999px; border: 1px solid var(--line); color: var(--ink-2); font-size: 14px; transition: background .15s, color .15s, border-color .15s; }
+.pill:hover { color: var(--ink); border-color: rgba(255,255,255,.35); }
+.pill[aria-pressed="true"] { background: var(--ink); color: #050506; border-color: var(--ink); font-weight: 500; }
+.key { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 8px 22px; margin-top: 20px; font-size: 13px; color: var(--ink-2); }
+.key span { display: inline-flex; align-items: center; gap: 8px; }
+.key i { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+.switch { display: inline-flex; align-items: center; gap: 9px; color: var(--ink-2); font-size: 13px; }
+.switch:hover { color: var(--ink); }
+.switch .sw { width: 30px; height: 17px; border-radius: 999px; border: 1px solid rgba(255,255,255,.3); position: relative; transition: background .15s; }
+.switch .sw::after { content: ""; position: absolute; top: 2px; left: 2px; width: 11px; height: 11px; border-radius: 50%; background: var(--ink-2); transition: transform .18s, background .18s; }
+.switch[aria-pressed="true"] { color: var(--ink); }
+.switch[aria-pressed="true"] .sw { background: var(--ink); }
+.switch[aria-pressed="true"] .sw::after { transform: translateX(13px); background: #050506; }
+
+/* chart */
+section.block { max-width: 880px; margin: 0 auto; padding: 96px 24px 24px; }
+.eyebrow { font-size: 12px; letter-spacing: .24em; text-transform: uppercase; color: var(--ink-3); }
+.block h2 { font-weight: 300; font-size: clamp(28px, 3.6vw, 40px); letter-spacing: -.03em; line-height: 1.1; margin: 12px 0 10px; text-wrap: balance; }
+.block .lead { color: var(--ink-2); margin: 0 0 36px; max-width: 60ch; }
+.bars { display: grid; gap: 4px; }
+.bar { display: grid; grid-template-columns: 170px 1fr 54px; align-items: center; gap: 16px; padding: 9px 12px; margin: 0 -12px; border-radius: 10px; text-align: left; transition: background .15s; }
+.bar:hover { background: rgba(255,255,255,.04); }
+.bar[aria-pressed="true"] { background: rgba(255,255,255,.07); }
+.bar .n { font-size: 15px; }
+.bar .track { height: 10px; border-radius: 999px; background: #141417; display: flex; overflow: hidden; }
+.bar .track i { height: 100%; }
+.bar .v { font: 14px var(--f-mono); text-align: right; color: var(--ink-2); font-variant-numeric: tabular-nums; }
+.axis { display: grid; grid-template-columns: 170px 1fr 54px; gap: 16px; font: 11px var(--f-mono); color: var(--ink-3); margin-top: 8px; }
+.axis div { display: flex; justify-content: space-between; }
+.note { color: var(--ink-2); font-size: 15px; margin: 28px 0 0; max-width: 62ch; }
+
+.facts { display: grid; grid-template-columns: repeat(3, 1fr); gap: 28px; margin-top: 8px; }
+.fact { border-top: 1px solid var(--line); padding-top: 18px; }
+.fact h3 { font-weight: 500; font-size: 16px; margin: 0 0 6px; }
+.fact p { color: var(--ink-2); font-size: 14.5px; margin: 0; }
+details { margin-top: 48px; border-top: 1px solid var(--line); padding-top: 18px; }
+summary { cursor: pointer; color: var(--ink-2); font-size: 14px; }
+summary:hover { color: var(--ink); }
+.refs { display: grid; grid-template-columns: auto 1fr; gap: 6px 20px; font-size: 13.5px; color: var(--ink-2); margin-top: 16px; }
+.refs span { color: var(--ink); }
+.small { color: var(--ink-3); font-size: 13px; margin-top: 18px; max-width: 70ch; }
+footer { max-width: 880px; margin: 0 auto; padding: 48px 24px 56px; color: var(--ink-3); font-size: 12.5px; }
+
+@media (max-width: 720px) {
+  .top { padding: 18px 20px; }
+  .intro .about, .insight { font-size: 15.5px; }
+  .stagewrap { min-height: 340px; }
+  .pill { padding: 7px 13px; font-size: 13.5px; }
+  .bar, .axis { grid-template-columns: 112px 1fr 40px; gap: 10px; }
+  .facts { grid-template-columns: 1fr; }
+  .label { left: 12px !important; right: 12px; top: auto !important; bottom: 12px; transform: none; max-width: none; }
+}
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+</head>
+<body>
+<nav class="top">
+  <div class="mark">Brain Atlas</div>
+  <a href="#about">How it works</a>
+</nav>
+
+<main>
+  <section class="hero" aria-label="Brain explorer">
+    <div class="intro">
+      <h1 id="h1">How brain conditions change the brain</h1>
+      <p class="about" id="about"></p>
+    </div>
+    <div class="stagewrap" id="wrap">
+      <canvas id="gl" aria-label="3D brain. Drag to spin it. Point at a glowing area to learn about it."></canvas>
+      <div class="loading" id="loading">Loading brain…</div>
+      <div class="label" id="label" role="status"></div>
+    </div>
+    <p class="insight" id="insight" aria-live="polite"></p>
+    <div class="pills" id="pills" role="group" aria-label="Choose a condition"></div>
+    <div class="key">
+      <span><i style="background:var(--smaller)"></i>Smaller than usual</span>
+      <span><i style="background:var(--bigger)"></i>Bigger than usual</span>
+      <span><i style="background:#3a3a40"></i>No big difference</span>
+      <button class="switch" id="inside" aria-pressed="false"><span class="sw"></span>See inside</button>
+    </div>
+  </section>
+
+  <section class="block" aria-labelledby="chartTitle">
+    <div class="eyebrow">Compare</div>
+    <h2 id="chartTitle">Which conditions change the brain the most?</h2>
+    <p class="lead">Each bar counts how many of the brain's 84 areas are noticeably different in people with that condition. Click a bar to see it on the brain.</p>
+    <div class="bars" id="bars"></div>
+    <div class="axis"><span></span><div><span>0</span><span>21</span><span>42</span><span>63</span><span>84 areas</span></div><span></span></div>
+    <p class="note">A short bar doesn't mean a condition is less serious. Some conditions change how brain cells work and connect, which a scan of brain size can't show.</p>
+  </section>
+
+  <section class="block" id="about" aria-labelledby="aboutTitle">
+    <div class="eyebrow">How it works</div>
+    <h2 id="aboutTitle">Thousands of brain scans, averaged together</h2>
+    <p class="lead">Scientists in the ENIGMA project collected MRI brain scans from research centers around the world. For each condition, they compared people who have it with people who don't, area by area.</p>
+    <div class="facts">
+      <div class="fact"><h3>Glowing means different</h3><p>An area glows when it is reliably smaller or bigger, on average, in people with the condition. Brighter means a bigger difference.</p></div>
+      <div class="fact"><h3>It's an average</h3><p>Every brain is different. Many people with a condition have brains that look completely typical in these areas.</p></div>
+      <div class="fact"><h3>Not a diagnosis</h3><p>You can't tell if someone has a condition by looking at their brain this way. The differences only show up across large groups.</p></div>
+    </div>
+    <details>
+      <summary>For scientists: methods and sources</summary>
+      <p class="small">Values are Cohen's d (case vs control, the toolbox's d_icv column) for cortical thickness in 68 Desikan–Killiany areas and volume in 16 subcortical structures. An area is shown as different when the difference passes FDR correction (q &lt; .05; uncorrected p &lt; .05 where only that was released: Parkinson's, and subcortical results for ADHD and depression) and |d| ≥ 0.2. "A little", "noticeably" and "much" mean |d| of 0.2–0.5, 0.5–0.8 and ≥ 0.8. Some older subcortical results average left and right. Epilepsy is all types combined. Data from the <a href="https://github.com/MICA-MNI/ENIGMA" target="_blank" rel="noopener">ENIGMA Toolbox</a> (Larivière et al., 2021, Nature Methods).</p>
+      <div class="refs" id="refs"></div>
+    </details>
+  </section>
+</main>
+<footer>Built with ENIGMA consortium summary statistics. For learning, not medical advice.</footer>
+
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/",
+  "three-mesh-bvh": "https://cdn.jsdelivr.net/npm/three-mesh-bvh@0.7.8/build/index.module.js"
+} }
+</script>
+<script id="data" type="application/json">__DATA__</script>
+<script id="mesh" type="text/plain">__MESH__</script>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { computeBoundsTree, acceleratedRaycast } from 'three-mesh-bvh';
+THREE.BufferGeometry.prototype.computeBoundsTree = computeBoundsTree;
+THREE.Mesh.prototype.raycast = acceleratedRaycast;
+
+const DATA = JSON.parse(document.getElementById('data').textContent);
+const RAW = Object.fromEntries(DATA.disorders.map(d => [d.id, d]));
+const NCT = 68, NREG = 84;
+const $ = id => document.getElementById(id);
+
+/* ---------- words a 7th grader can read ---------- */
+const COND = [
+  ['22q', '22q11.2 deletion', 'people with 22q11.2 deletion', 'A genetic condition where a tiny piece of chromosome 22 is missing.'],
+  ['adhd', 'ADHD', 'people with ADHD', 'Trouble focusing, sitting still or waiting your turn, starting in childhood.'],
+  ['an', 'Anorexia', 'people with anorexia', 'An eating disorder where someone eats far too little and becomes very underweight.'],
+  ['asb', 'Antisocial behavior', 'people with antisocial behavior', 'A pattern of breaking rules, fighting or hurting others, mostly studied in teens.'],
+  ['asd', 'Autism', 'autistic people', 'A different way of experiencing the world that often affects communication and routines.'],
+  ['bd', 'Bipolar disorder', 'people with bipolar disorder', 'Big mood swings between very high energy and very low, sad periods.'],
+  ['mdd', 'Depression', 'people with depression', 'Feeling sad, empty or uninterested in things for weeks at a time.'],
+  ['epi', 'Epilepsy', 'people with epilepsy', 'Repeated seizures caused by sudden bursts of electrical activity in the brain.'],
+  ['ocd', 'OCD', 'people with OCD', 'Unwanted thoughts and strong urges to repeat actions, like checking or washing.'],
+  ['pd', "Parkinson's", "people with Parkinson's", 'A condition that slowly affects movement, causing shaking and stiffness.'],
+  ['scz', 'Schizophrenia', 'people with schizophrenia', 'A condition that can make it hard to tell what is real, like hearing voices others don’t.'],
+].map(([id, name, who, desc]) => ({ id, name, who, desc }));
+const C = Object.fromEntries(COND.map(c => [c.id, c]));
+
+const AREA = {
+  bankssts: ['Superior temporal sulcus', 'reading faces and voices'], caudalanteriorcingulate: ['Anterior cingulate', 'noticing mistakes'],
+  caudalmiddlefrontal: ['Middle frontal gyrus', 'paying attention'], cuneus: ['Cuneus', 'seeing'], entorhinal: ['Entorhinal cortex', 'memory and finding your way'],
+  fusiform: ['Fusiform gyrus', 'recognizing faces and words'], inferiorparietal: ['Inferior parietal lobule', 'understanding meaning'],
+  inferiortemporal: ['Inferior temporal gyrus', 'recognizing objects'], isthmuscingulate: ['Cingulate isthmus', 'remembering your own past'],
+  lateraloccipital: ['Lateral occipital cortex', 'seeing shapes and motion'], lateralorbitofrontal: ['Orbitofrontal cortex', 'weighing rewards and risks'],
+  lingual: ['Lingual gyrus', 'seeing letters and colors'], medialorbitofrontal: ['Medial orbitofrontal cortex', 'making choices and handling emotions'],
+  middletemporal: ['Middle temporal gyrus', 'understanding words'], parahippocampal: ['Parahippocampal gyrus', 'remembering places'],
+  paracentral: ['Paracentral lobule', 'moving and feeling your legs'], parsopercularis: ['Broca’s area (back)', 'speaking'],
+  parsorbitalis: ['Pars orbitalis', 'finding the right words'], parstriangularis: ['Broca’s area (front)', 'language'],
+  pericalcarine: ['Primary visual cortex', 'seeing'], postcentral: ['Touch strip', 'feeling touch'], posteriorcingulate: ['Posterior cingulate', 'daydreaming and thinking about yourself'],
+  precentral: ['Motor strip', 'moving your body'], precuneus: ['Precuneus', 'imagining and remembering'], rostralanteriorcingulate: ['Front cingulate', 'handling emotions'],
+  rostralmiddlefrontal: ['Front middle frontal gyrus', 'planning and keeping things in mind'], superiorfrontal: ['Superior frontal gyrus', 'self-control and planning'],
+  superiorparietal: ['Superior parietal lobule', 'knowing where things are around you'], superiortemporal: ['Superior temporal gyrus', 'hearing and understanding speech'],
+  supramarginal: ['Supramarginal gyrus', 'the sounds of words'], frontalpole: ['Frontal pole', 'big-picture thinking'], temporalpole: ['Temporal pole', 'knowing about people and things'],
+  transversetemporal: ['Primary auditory cortex', 'hearing'], insula: ['Insula', 'sensing what’s happening inside your body'],
+};
+const DEEP = [['Nucleus accumbens', 'reward and motivation'], ['Amygdala', 'fear and strong emotions'], ['Caudate', 'learning habits and goals'], ['Hippocampus', 'making new memories'], ['Pallidum', 'controlling movement'], ['Putamen', 'movement and habits'], ['Thalamus', 'passing signals around the brain'], ['Ventricle', null]];
+const REG = [];
+for (let i = 0; i < NCT; i++) { const raw = DATA.ctNames[i], a = AREA[raw.slice(2)]; REG.push({ side: raw[0] === 'L' ? 'left' : 'right', name: a[0], fn: a[1], deep: false }); }
+for (let k = 0; k < 16; k++) { const d = DEEP[k % 8]; REG.push({ side: k < 8 ? 'left' : 'right', name: d[0], fn: d[1], deep: true }); }
+const helps = r => REG[r].fn ? `Helps with ${REG[r].fn}` : 'A fluid-filled space that grows when nearby brain tissue shrinks';
+
+/* ---------- stats ---------- */
+const entry = (id, r) => r < NCT ? RAW[id].m.CT[r] : RAW[id].m.SV[r - NCT];
+const reliable = e => !!e && (e[4] != null ? e[4] < 0.05 : e[3] != null ? Math.abs(e[3]) < 0.05 || (e[3] < 0 && -e[3] <= 0.05) : false);
+const shows = e => reliable(e) && Math.abs(e[0]) >= 0.2;   // "noticeably different"
+const level = d => Math.abs(d) >= 0.8 ? 3 : Math.abs(d) >= 0.5 ? 2 : 1;
+const words = d => ['', 'A little', 'Noticeably', 'Much'][level(d)] + (d < 0 ? ' smaller' : ' bigger') + ' than usual';
+function summary(id) { let sm = 0, bg = 0, best = -1, bd = 0; for (let r = 0; r < NREG; r++) { const e = entry(id, r); if (!shows(e)) continue; e[0] < 0 ? sm++ : bg++; if (Math.abs(e[0]) > bd) { bd = Math.abs(e[0]); best = r; } } return { sm, bg, n: sm + bg, best }; }
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+/* ---------- color: dark brain, changed areas glow ---------- */
+const BASE = new THREE.Color('#3a3a40'), WALL = new THREE.Color('#1c1c20');
+const SMALL = ['#2f5fb8', '#5b9bf5', '#c3dcff'], BIG = ['#b9531c', '#f6913f', '#fed7aa'];
+function colorFor(id, r, out) {
+  const e = entry(id, r);
+  if (!shows(e)) return out.copy(BASE);
+  const a = Math.min(1, (Math.abs(e[0]) - 0.2) / 0.7), P = e[0] < 0 ? SMALL : BIG;   // 0.2 -> darkest glow, 0.9+ -> brightest
+  const i = a < 0.5 ? 0 : 1, f = a < 0.5 ? a / 0.5 : (a - 0.5) / 0.5;
+  return out.set(P[i]).lerp(new THREE.Color(P[i + 1]), f);
+}
+
+/* ---------- scene ---------- */
+const S = { view: 'scz', hover: -1, inside: false, idle: true };
+{ const h = location.hash.slice(1); if (C[h]) S.view = h; }
+const wrap = $('wrap'), canvas = $('gl');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2)); renderer.setClearColor(0, 0);
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(28, 1, 1, 3000); scene.add(camera);
+scene.add(new THREE.HemisphereLight(0xffffff, 0x30303a, 0.6));
+const key = new THREE.DirectionalLight(0xffffff, 1.0); key.position.set(-0.3, 0.7, 1); camera.add(key);
+const rim = new THREE.DirectionalLight(0xffffff, 0.5); rim.position.set(0.6, 0.2, -1); camera.add(rim);
+const controls = new OrbitControls(camera, canvas);
+Object.assign(controls, { enableDamping: true, dampingFactor: 0.07, enableZoom: false, enablePan: false, autoRotate: true, autoRotateSpeed: 0.6, rotateSpeed: 0.7 });
+const brain = new THREE.Group(); scene.add(brain);
+const trueColor = m => { m.onBeforeCompile = sh => { sh.fragmentShader = sh.fragmentShader.replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\n totalEmissiveRadiance += diffuseColor.rgb * 0.55;'); }; return m; };
+const cortexMat = trueColor(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.75, metalness: 0 }));
+const borderMat = new THREE.LineBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.4 });
+const outlineMat = new THREE.LineBasicMaterial({ color: 0xffffff });
+const cortex = {}, subc = [];
+const RG = Array.from({ length: NREG }, () => ({ edges: [] }));
+
+function bytes(s) { const b = atob(s.trim()), o = new Uint8Array(b.length); for (let i = 0; i < b.length; i++) o[i] = b.charCodeAt(i); return o; }
+async function loadMesh() {
+  const ds = new Blob([bytes($('mesh').textContent)]).stream().pipeThrough(new DecompressionStream('gzip'));
+  const buf = await new Response(ds).arrayBuffer();
+  const { lo, hi, parts } = DATA.mesh, ctr = lo.map((v, i) => (v + hi[i]) / 2);
+  for (const p of parts) {
+    const q = new Uint16Array(buf, p.pos, p.nv * 3), I = new Uint32Array(new Uint16Array(buf, p.idx, p.nf * 3)), P = new Float32Array(p.nv * 3);
+    for (let v = 0; v < p.nv; v++) {
+      const x = lo[0] + q[3 * v] / 65535 * (hi[0] - lo[0]) - ctr[0], y = lo[1] + q[3 * v + 1] / 65535 * (hi[1] - lo[1]) - ctr[1], z = lo[2] + q[3 * v + 2] / 65535 * (hi[2] - lo[2]) - ctr[2];
+      P[3 * v] = x; P[3 * v + 1] = z; P[3 * v + 2] = -y;
+    }
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(P, 3)); g.setIndex(new THREE.BufferAttribute(I, 1)); g.computeVertexNormals();
+    const N = g.attributes.normal.array, m = [0, 0, 0]; let dot = 0;
+    for (let v = 0; v < p.nv; v++) for (let c = 0; c < 3; c++) m[c] += P[3 * v + c] / p.nv;
+    for (let v = 0; v < p.nv; v++) for (let c = 0; c < 3; c++) dot += (P[3 * v + c] - m[c]) * N[3 * v + c];
+    if (dot < 0) { for (let f = 0; f < p.nf; f++) { const t = I[3 * f + 1]; I[3 * f + 1] = I[3 * f + 2]; I[3 * f + 2] = t; } g.computeVertexNormals(); }
+    if (p.tri !== undefined) buildCortex(p, g, new Uint8Array(buf, p.tri, p.nf), new Uint8Array(buf, p.sh, p.nv)); else buildSub(p, g);
+  }
+}
+function buildCortex(p, g, tri, sh) {
+  const P = g.attributes.position.array, N = g.attributes.normal.array, I = g.index.array, nv = p.nv, seen = new Map(), border = [];
+  for (let f = 0; f < p.nf; f++) for (let e = 0; e < 3; e++) {
+    const a = I[3 * f + e], b = I[3 * f + (e + 1) % 3], k = a < b ? a * nv + b : b * nv + a, o = seen.get(k);
+    if (o === undefined) seen.set(k, f);
+    else if (tri[o] !== tri[f]) { border.push(a, b); if (tri[f] < NREG) RG[tri[f]].edges.push(p.name, a, b); if (tri[o] < NREG) RG[tri[o]].edges.push(p.name, a, b); }
+  }
+  const shade = new Float32Array(p.nf * 3);
+  for (let i = 0; i < p.nf * 3; i++) shade[i] = 0.72 + 0.28 * (sh[I[i]] / 255);
+  const gn = g.toNonIndexed(), colors = new Float32Array(p.nf * 9);
+  gn.setAttribute('color', new THREE.BufferAttribute(colors, 3)); gn.computeBoundsTree();
+  const mesh = new THREE.Mesh(gn, cortexMat); mesh.userData.tri = tri; brain.add(mesh);
+  const lp = new Float32Array(border.length * 3);
+  for (let i = 0; i < border.length; i++) for (let c = 0; c < 3; c++) lp[3 * i + c] = P[3 * border[i] + c] + N[3 * border[i] + c] * 0.12;
+  const lg = new THREE.BufferGeometry(); lg.setAttribute('position', new THREE.BufferAttribute(lp, 3));
+  const lines = new THREE.LineSegments(lg, borderMat); brain.add(lines);
+  cortex[p.name] = { mesh, tri, colors, shade, lines, P, N };
+}
+function buildSub(p, g) {
+  g.computeBoundsTree();
+  const mesh = new THREE.Mesh(g, trueColor(new THREE.MeshStandardMaterial({ color: 0x3a3a40, roughness: 0.6, metalness: 0 })));
+  mesh.userData.region = NCT + p.sv; mesh.visible = false; brain.add(mesh); subc[p.sv] = mesh;
+}
+
+/* ---------- paint with a soft cross-fade ---------- */
+const cur = Array.from({ length: NREG }, () => BASE.clone()), from = cur.map(c => c.clone()), to = cur.map(c => c.clone());
+let fade = 1;
+function retarget() { for (let r = 0; r < NREG; r++) { from[r].copy(cur[r]); colorFor(S.view, r, to[r]); } fade = 0; }
+const WHITE = new THREE.Color(1, 1, 1);
+function paint() {
+  const lin = cur.map((c, r) => r === S.hover ? c.clone().lerp(WHITE, 0.3) : c);   // THREE.Color is already linear
+  for (const h in cortex) {
+    const { colors, tri, shade, mesh } = cortex[h];
+    for (let f = 0; f < tri.length; f++) { const c = tri[f] < NREG ? lin[tri[f]] : WALL; for (let k = 0; k < 3; k++) { const s = shade[3 * f + k], o = 9 * f + 3 * k; colors[o] = c.r * s; colors[o + 1] = c.g * s; colors[o + 2] = c.b * s; } }
+    mesh.geometry.attributes.color.needsUpdate = true;
+  }
+  subc.forEach((m, k) => m && m.material.color.copy(lin[NCT + k]));
+}
+function stepFade(dt) { if (fade >= 1) return false; fade = Math.min(1, fade + dt / 0.5); const t = 1 - Math.pow(1 - fade, 3); for (let r = 0; r < NREG; r++) cur[r].copy(from[r]).lerp(to[r], t); return true; }
+
+let outline = null;
+function updateOutline() {
+  if (outline) { brain.remove(outline); outline.geometry.dispose(); outline = null; }
+  const r = S.hover; if (r < 0 || r >= NCT || S.inside) return;
+  const E = RG[r].edges, pts = new Float32Array(E.length * 2); let j = 0;
+  for (let i = 0; i < E.length; i += 3) { const Cx = cortex[E[i]]; for (const v of [E[i + 1], E[i + 2]]) for (let c = 0; c < 3; c++) pts[j++] = Cx.P[3 * v + c] + Cx.N[3 * v + c] * 0.3; }
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(pts, 3));
+  outline = new THREE.LineSegments(g, outlineMat); outline.renderOrder = 5; brain.add(outline);
+}
+function setInside(v) {
+  S.inside = v; $('inside').setAttribute('aria-pressed', String(v));
+  for (const h in cortex) { cortex[h].lines.visible = !v; cortex[h].mesh.renderOrder = v ? 2 : 0; }
+  Object.assign(cortexMat, { transparent: v, opacity: v ? 0.07 : 1, depthWrite: !v }); cortexMat.needsUpdate = true;
+  subc.forEach(m => m && (m.visible = v)); updateOutline();
+}
+
+/* ---------- hover label ---------- */
+const ray = new THREE.Raycaster(); ray.firstHitOnly = true; const ndc = new THREE.Vector2();
+function pick(x, y) {
+  const rc = canvas.getBoundingClientRect();
+  ndc.set((x - rc.left) / rc.width * 2 - 1, -(y - rc.top) / rc.height * 2 + 1); camera.updateMatrixWorld(); ray.setFromCamera(ndc, camera);
+  if (S.inside) { const h = ray.intersectObjects(subc.filter(Boolean), false); if (h.length) return h[0].object.userData.region; }
+  const h = ray.intersectObjects(Object.values(cortex).map(c => c.mesh), false);
+  // three-mesh-bvh reorders triangles, so map the hit back through its vertex id (non-indexed: vertex v is in triangle floor(v/3))
+  if (h.length) { const t = h[0].object.userData.tri[Math.floor(h[0].face.a / 3)]; return t < NREG ? t : -1; }
+  return -1;
+}
+const label = $('label');
+function showLabel(r, x, y) {
+  if (r < 0) { label.classList.remove('on'); return; }
+  const e = entry(S.view, r), R = REG[r], on = shows(e), col = on ? '#' + colorFor(S.view, r, new THREE.Color()).getHexString() : 'var(--ink-2)';
+  let dots = ''; for (let i = 1; i <= 3; i++) dots += `<i style="${on && i <= level(e[0]) ? 'background:' + col : ''}"></i>`;
+  label.innerHTML = `<div class="nm">${esc(R.name)}</div><div class="fn">${esc(helps(r))}</div>
+    <div class="chg" style="color:${on ? col : 'var(--ink-2)'}">${on ? `<span class="dots">${dots}</span>${words(e[0])}` : e ? 'About the same as usual' : 'Not measured'}</div>
+    <div class="sci">${R.side} side${e ? ` · d ${e[0] < 0 ? '−' : '+'}${Math.abs(e[0]).toFixed(2)}` : ''}</div>`;
+  const wr = wrap.getBoundingClientRect(); let lx = x - wr.left, ly = y - wr.top;
+  if (lx + 290 > wr.width) lx -= 300;
+  label.style.left = lx + 'px'; label.style.top = ly + 'px'; label.classList.add('on');
+}
+let down = null, pending = null;
+canvas.addEventListener('pointerdown', ev => { down = { x: ev.clientX, y: ev.clientY }; canvas.classList.add('drag'); stop(); });
+addEventListener('pointerup', ev => { canvas.classList.remove('drag'); if (down && ev.target === canvas && Math.hypot(ev.clientX - down.x, ev.clientY - down.y) < 6) { const r = pick(ev.clientX, ev.clientY); setHover(r); showLabel(r, ev.clientX, ev.clientY); } down = null; });
+canvas.addEventListener('pointermove', ev => { if (ev.pointerType === 'mouse') pending = ev; });
+canvas.addEventListener('pointerleave', () => { pending = null; setHover(-1); showLabel(-1); });
+function setHover(r) { if (r === S.hover) return; S.hover = r; canvas.classList.toggle('hit', r >= 0); paint(); updateOutline(); }
+function handleHover() { if (!pending || down) return; const ev = pending; pending = null; const r = pick(ev.clientX, ev.clientY); if (r >= 0) stop(); setHover(r); showLabel(r, ev.clientX, ev.clientY); }
+function stop() { if (S.idle) { S.idle = false; controls.autoRotate = false; } }
+
+/* ---------- words on the page ---------- */
+function renderText() {
+  const c = C[S.view], s = summary(S.view);
+  $('h1').textContent = c.name;
+  $('about').textContent = c.desc;
+  let t;
+  if (!s.n) t = `In ${esc(c.who)}, no brain area is noticeably different in size. The changes may be too small to see, or in how the brain works instead.`;
+  else {
+    const dir = s.bg === 0 ? 'smaller' : s.sm === 0 ? 'bigger' : s.sm >= s.bg ? 'mostly smaller' : 'mostly bigger';
+    t = `In ${esc(c.who)}, <b>${s.n} of 84</b> brain areas are noticeably different, ${dir}. The biggest change is the <b>${esc(REG[s.best].name.toLowerCase())}</b>${REG[s.best].fn ? `, which helps with ${esc(REG[s.best].fn)}` : ', a fluid-filled space deep in the brain'}.`;
+    if (REG[s.best].deep && !S.inside) t += ' Turn on See inside to find it.';
+  }
+  $('insight').innerHTML = t;
+  document.querySelectorAll('.pill').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.id === S.view)));
+  document.querySelectorAll('.bar').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.id === S.view)));
+}
+function setView(id, scroll) {
+  S.view = id; try { history.replaceState(null, '', '#' + id); } catch (e) {}
+  retarget(); renderText(); if (S.hover >= 0) showLabel(-1);
+  if (scroll) document.querySelector('.hero').scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+}
+$('pills').innerHTML = COND.map(c => `<button class="pill" data-id="${c.id}" aria-pressed="false">${esc(c.name)}</button>`).join('');
+$('pills').addEventListener('click', ev => { const b = ev.target.closest('.pill'); if (b) setView(b.dataset.id); });
+const ranked = COND.map(c => [c, summary(c.id)]).sort((a, b) => b[1].n - a[1].n || a[0].name.localeCompare(b[0].name));
+$('bars').innerHTML = ranked.map(([c, s]) => `<button class="bar" data-id="${c.id}" aria-pressed="false" aria-label="${esc(c.name)}: ${s.n} of 84 areas different (${s.sm} smaller, ${s.bg} bigger)">
+  <span class="n">${esc(c.name)}</span><span class="track"><i style="width:${s.sm / 84 * 100}%;background:var(--smaller)"></i><i style="width:${s.bg / 84 * 100}%;background:var(--bigger)"></i></span><span class="v">${s.n}</span></button>`).join('');
+$('bars').addEventListener('click', ev => { const b = ev.target.closest('.bar'); if (b) setView(b.dataset.id, true); });
+$('inside').addEventListener('click', () => { setInside(!S.inside); renderText(); });
+$('refs').innerHTML = COND.map(c => { const d = RAW[c.id]; return `<span>${esc(c.name)}</span><div><a href="${d.urlCort}" target="_blank" rel="noopener">${esc(d.refCort)}</a>${d.refSub !== d.refCort ? `; <a href="${d.urlSub}" target="_blank" rel="noopener">${esc(d.refSub)}</a>` : ''}</div>`; }).join('');
+
+/* ---------- loop ---------- */
+function size() { const w = wrap.clientWidth, h = wrap.clientHeight; renderer.setSize(w, h, false); camera.aspect = w / Math.max(1, h); camera.zoom = Math.min(1.15, (w / h) * (w < 720 ? 0.9 : 0.72)); camera.updateProjectionMatrix(); }
+new ResizeObserver(size).observe(wrap);
+let last = performance.now();
+function loop(now) { const dt = Math.min(0.05, (now - last) / 1000); last = now; if (stepFade(dt)) paint(); controls.update(); handleHover(); renderer.render(scene, camera); requestAnimationFrame(loop); }
+(async () => {
+  renderText();
+  try { await loadMesh(); } catch (err) { $('loading').textContent = 'This browser could not load the 3D brain.'; return; }
+  $('loading').remove();
+  camera.position.set(-340, 90, -150);
+  for (let r = 0; r < NREG; r++) colorFor(S.view, r, cur[r]);
+  paint(); size(); requestAnimationFrame(loop);
+  window.__app = { S, setView, setInside, controls, pick, camera };
+})();
+</script>
+</body>
+</html>
